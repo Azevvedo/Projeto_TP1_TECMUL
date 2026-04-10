@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class PlayerCamera : MonoBehaviour
 {
@@ -8,26 +7,17 @@ public class PlayerCamera : MonoBehaviour
 
     float xRotation = 0f;
     Vector2 lookInput;
-
     PlayerInputActions controls;
 
     void Awake()
     {
         controls = new PlayerInputActions();
-
         controls.Player.Look.performed += ctx => lookInput = ctx.ReadValue<Vector2>();
         controls.Player.Look.canceled += ctx => lookInput = Vector2.zero;
     }
 
-    void OnEnable()
-    {
-        controls.Enable();
-    }
-
-    void OnDisable()
-    {
-        controls.Disable();
-    }
+    void OnEnable() => controls.Enable();
+    void OnDisable() => controls.Disable();
 
     void Start()
     {

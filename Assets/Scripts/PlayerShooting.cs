@@ -2,44 +2,84 @@ using UnityEngine;
 
 public class PlayerShooting : MonoBehaviour
 {
-    [Header("Shooting Settings")]
-    public float range = 100f;     // how far the shot goes
-    public int damage = 10;        // damage (for later)
+    [Header("VFX Settings")]
+    public GameObject impactPrefab;
+    public GameObject muzzleFlashPrefab;
 
+    private Weapon weapon;
+    private Transform firePoint;
+    private Camera cam;
+    private float nextTimeToFire;
+    
     private PlayerInputActions controls;
+    private PlayerMovement playerMovement;
+    private WeaponSway weaponSway;
 
     private void Awake()
     {
         controls = new PlayerInputActions();
+        cam = Camera.main;
+        playerMovement = GetComponentInParent<PlayerMovement>();
     }
 
     private void OnEnable() => controls.Enable();
     private void OnDisable() => controls.Disable();
 
-    private void Update()
+    void Update()
     {
-        // Fire input (left click)
-        if (controls.Player.Shoot.triggered)
+        if (weapon == null) { FindWeapon(); return; }
+        HandleShooting();
+    }
+
+    void FindWeapon()
+    {
+        weapon = GetComponentInChildren<Weapon>(true);
+        if (weapon != null)
         {
+            weaponSway = weapon.GetComponent<WeaponSway>();
+            firePoint = weapon.transform.Find("FirePoint");
+            if (firePoint == null) firePoint = weapon.transform;
+        }
+    }
+
+    void HandleShooting()
+    {
+        if (playerMovement != null && (playerMovement.IsRunning || !playerMovement.IsGrounded)) return;
+
+        bool shootInput = weapon.automatic ? controls.Player.Shoot.ReadValue<float>() > 0 : controls.Player.Shoot.triggered;
+
+        if (shootInput && Time.time >= nextTimeToFire)
+        {
+            nextTimeToFire = Time.time + (1f / weapon.fireRate);
             Shoot();
         }
     }
 
     void Shoot()
     {
-        // Create a ray from the camera forward
-        Ray ray = new Ray(transform.position, transform.forward);
-        RaycastHit hit;
-
-        if (Physics.Raycast(ray, out hit, range))
+      
+        if (muzzleFlashPrefab != null && firePoint != null)
         {
-            Debug.Log("Hit: " + hit.collider.name);
+            GameObject flash = Instantiate(muzzleFlashPrefab, firePoint.position, firePoint.rotation, firePoint);
+            Destroy(flash, 0.1f);
+        }
 
-            // Try to damage enemy (optional for later)
-            var target = hit.collider.GetComponent<Enemy>();
-            if (target != null)
+        
+        float adsMultiplier = (weaponSway != null && weaponSway.EstaMirando) ? 0.2f : 1.0f;
+        float currentSpread = weapon.spread * adsMultiplier;
+
+        Ray ray = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        Vector3 dir = ray.direction;
+        dir.x += Random.Range(-currentSpread, currentSpread) * 0.01f;
+        dir.y += Random.Range(-currentSpread, currentSpread) * 0.01f;
+
+        
+        if (Physics.Raycast(cam.transform.position, dir, out RaycastHit hit, weapon.range))
+        {
+
+            if (impactPrefab) 
             {
-                target.TakeDamage(damage);
+                Instantiate(impactPrefab, hit.point, Quaternion.LookRotation(hit.normal));
             }
         }
     }
